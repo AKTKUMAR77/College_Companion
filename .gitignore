@@ -1,0 +1,30 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+
+# Python virtual environments
+.venv/
+venv/
+**/.venv/
+**/venv/
+
+# Python cache and artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Django/Flask local runtime files
+*.sqlite3
+*.log
+uploads/
+
+# Flutter and Dart build artifacts
+**/.dart_tool/
+**/build/
+**/.flutter-plugins-dependencies
+
+# Keep frontend source, but ignore its nested git metadata if present
+college_companion_frontend/.git/
+college_companion_frontend/.git_backup/
