@@ -158,7 +158,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
   }
 
   Future<void> _decideRequest({
-    required int requestId,
+    required String requestId,
     required String action,
     required bool canSendMessage,
   }) async {
@@ -305,7 +305,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
             ),
             const SizedBox(height: 8),
             ..._pendingRequests.map((request) {
-              final requestId = request['id'] as int;
+              final requestId = (request['id'] ?? '').toString();
               final studentName = (request['student_name'] ?? '').toString();
               final studentRoll = (request['student_roll'] ?? '').toString();
 

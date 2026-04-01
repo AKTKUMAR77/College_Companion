@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../session.dart';
-import '../services/api_config.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 
 class ChatPage extends StatefulWidget {
@@ -14,17 +12,14 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final String _baseUrl = ApiConfig.baseUrl;
   List<Map<String, dynamic>> messages = [];
   final TextEditingController controller = TextEditingController();
   bool _sending = false;
 
   Future<void> fetch() async {
-    final res = await http.get(
-      Uri.parse('$_baseUrl/messages/${widget.group}'),
-    );
+    final result = await Api.fetchMessages(widget.group);
     setState(() {
-      messages = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      messages = result;
     });
   }
 
@@ -36,13 +31,10 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _sending = true);
 
     try {
-      await http.post(
-        Uri.parse('$_baseUrl/messages/${widget.group}'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'sender': UserSession.name,
-          'text': controller.text.trim(),
-        }),
+      await Api.sendMessage(
+        widget.group,
+        UserSession.name,
+        controller.text.trim(),
       );
       controller.clear();
       await fetch();
