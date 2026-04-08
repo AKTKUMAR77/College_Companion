@@ -438,7 +438,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
               decoration: BoxDecoration(
-                color: isMine ? AppTheme.brandBlue : const Color(0xFFF6F9FF),
+                color: isMine ? AppTheme.richBrown : const Color(0xFFF6F9FF),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(14),
                   topRight: const Radius.circular(14),
@@ -454,7 +454,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: isMine ? Colors.white70 : AppTheme.brandBlue,
+                      color: isMine ? Colors.white70 : AppTheme.richBrown,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -462,7 +462,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                     text,
                     style: TextStyle(
                       fontSize: 15,
-                      color: isMine ? Colors.white : AppTheme.textStrong,
+                      color: isMine ? Colors.white : AppTheme.textDark,
                     ),
                   ),
                 ],
@@ -501,7 +501,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
           ),
           const SizedBox(width: 8),
           Material(
-            color: canCompose ? AppTheme.brandBlue : Colors.blueGrey.shade300,
+            color: canCompose ? AppTheme.richBrown : Colors.blueGrey.shade300,
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
@@ -535,32 +535,45 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.clubName),
+        title: Row(
+          children: [
+            Icon(Icons.group_rounded, color: AppTheme.cream, size: 28),
+            const SizedBox(width: 12),
+            Text(widget.clubName),
+          ],
+        ),
+        centerTitle: false,
+        backgroundColor: AppTheme.richBrown,
+        elevation: 8,
         actions: [
           IconButton(
             onPressed: _refreshAll,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.cream),
           ),
         ],
       ),
+      backgroundColor: AppTheme.lightCream,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                    children: [
-                      _buildStatusCard(),
-                      const SizedBox(height: 8),
-                      _buildAdminRequests(),
-                      _buildAdminMembers(),
-                      if (canViewChat) _buildMessages(),
-                    ],
+          : Container(
+              decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                      children: [
+                        _buildStatusCard(),
+                        const SizedBox(height: 8),
+                        _buildAdminRequests(),
+                        _buildAdminMembers(),
+                        if (canViewChat) _buildMessages(),
+                      ],
+                    ),
                   ),
-                ),
-                if (canViewChat) _buildComposer(),
-              ],
+                  if (canViewChat) _buildComposer(),
+                ],
+              ),
             ),
     );
   }

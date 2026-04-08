@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class Api {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -91,12 +92,7 @@ class Api {
       }
     }
 
-    return {
-      'year': year,
-      'branch': branch,
-      'section': section,
-      'group': group,
-    };
+    return {'year': year, 'branch': branch, 'section': section, 'group': group};
   }
 
   static List<String> _buildGroupsForUser({
@@ -121,7 +117,33 @@ class Api {
     if (section != null && group != null && group.isNotEmpty) {
       groups.add('$section-$group');
     }
+    
+    // Add Restricted Groups
+    final branchName = decoded['branch'] as String;
+    groups.add('$branchName Announcements');
+    groups.add('$branchName Notes');
     return groups;
+  }
+
+  static Future<String?> resolveEmailForPasswordReset(String identifier) async {
+    final normalized = identifier.trim();
+    if (normalized.contains('@')) {
+      final query = await _db
+          .collection('users')
+          .where('email', isEqualTo: normalized.toLowerCase())
+          .limit(1)
+          .get();
+      if (query.docs.isEmpty) {
+        return null;
+      }
+      return (query.docs.first.data()['email'] ?? '').toString();
+    }
+
+    final userDoc = await _db.collection('users').doc(normalized).get();
+    if (!userDoc.exists) {
+      return null;
+    }
+    return (userDoc.data()?['email'] ?? '').toString();
   }
 
   static Future<List<String>> _getAllAccessibleGroups() async {
@@ -162,6 +184,7 @@ class Api {
         'roll': _adminEmployeeId,
         'role': 'faculty',
         'is_admin': true,
+        'is_cr': false,
         'groups': await _getAllAccessibleGroups(),
       };
     }
@@ -176,9 +199,44 @@ class Api {
       throw Exception('Role mismatch for this account');
     }
 
-    if ((data['password_hash'] ?? '').toString() !=
-        _hashPassword(normalizedPassword)) {
-      throw Exception('Invalid credentials');
+    // Get the email from Firestore
+    final email = (data['email'] ?? '').toString().trim();
+    if (email.isEmpty) {
+      throw Exception(
+        'This account is not linked to an email. Please contact support.',
+      );
+    }
+
+    final overrideValue = data['email_verified_admin_override'];
+    final adminOverrideVerified =
+        overrideValue == true ||
+        overrideValue.toString().toLowerCase() == 'true';
+
+    // Authenticate using Firebase Auth (uses current password in Firebase)
+    try {
+      final userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: email,
+            password: normalizedPassword,
+          );
+
+      if (!userCredential.user!.emailVerified && !adminOverrideVerified) {
+        await FirebaseAuth.instance.signOut();
+        throw Exception('Please verify your email before signing in.');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw Exception('Invalid credentials');
+      }
+      if (e.code == 'user-not-found') {
+        throw Exception(
+          'Linked email account not found. Please contact support.',
+        );
+      }
+      if (e.code == 'too-many-requests') {
+        throw Exception('Too many failed login attempts. Try again later.');
+      }
+      throw Exception('Authentication failed: ${e.message}');
     }
 
     return {
@@ -186,6 +244,7 @@ class Api {
       'roll': normalizedRoll,
       'role': normalizedRole,
       'is_admin': false,
+      'is_cr': data['is_cr'] == true,
       'groups': _buildGroupsForUser(role: normalizedRole, roll: normalizedRoll),
     };
   }
@@ -194,11 +253,13 @@ class Api {
     String role,
     String name,
     String roll,
+    String email,
     String password,
   ) async {
     final normalizedRole = role.trim().toLowerCase();
     final normalizedName = name.trim();
     final normalizedRoll = roll.trim();
+    final normalizedEmail = email.trim().toLowerCase();
     final normalizedPassword = password.trim();
 
     if (normalizedRole == 'student') {
@@ -211,13 +272,46 @@ class Api {
       throw Exception('User already exists');
     }
 
-    await userRef.set({
-      'role': normalizedRole,
-      'name': normalizedName,
-      'roll': normalizedRoll,
-      'password_hash': _hashPassword(normalizedPassword),
-      'created_at': FieldValue.serverTimestamp(),
-    });
+    final existingEmailQuery = await _db
+        .collection('users')
+        .where('email', isEqualTo: normalizedEmail)
+        .limit(1)
+        .get();
+    if (existingEmailQuery.docs.isNotEmpty) {
+      throw Exception('This email is already registered.');
+    }
+
+    UserCredential? userCredential;
+    try {
+      userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: normalizedEmail,
+            password: normalizedPassword,
+          );
+      await userCredential.user?.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        throw Exception('An account already exists with this email.');
+      }
+      if (e.code == 'weak-password') {
+        throw Exception('The password provided is too weak.');
+      }
+      throw Exception(e.message ?? 'Failed to create account.');
+    }
+
+    try {
+      await userRef.set({
+        'role': normalizedRole,
+        'name': normalizedName,
+        'roll': normalizedRoll,
+        'email': normalizedEmail,
+        'is_cr': normalizedRole == 'student' && normalizedRoll.endsWith('01'),
+        'created_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      await userCredential.user?.delete();
+      throw Exception('Could not save user profile. Please try again.');
+    }
   }
 
   static Future<Map<String, dynamic>> fetchPyqOptions() async {
@@ -234,27 +328,79 @@ class Api {
     required String branch,
     required String semester,
   }) async {
-    final snapshot = await _db
-        .collection('pyq')
-        .where('year', isEqualTo: year)
-        .where('branch', isEqualTo: branch)
-        .where('semester', isEqualTo: semester)
-        .orderBy('created_at', descending: true)
-        .get();
+    final cleanYear = year.trim();
+    final cleanBranch = branch.trim();
+    final cleanSemester = semester.trim();
 
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        'id': doc.id,
-        'year': (data['year'] ?? '').toString(),
-        'branch': (data['branch'] ?? '').toString(),
-        'semester': (data['semester'] ?? '').toString(),
-        'subject': (data['subject'] ?? '').toString(),
-        'drive_link': (data['drive_link'] ?? '').toString(),
-        'uploaded_by': (data['uploaded_by'] ?? '').toString(),
-        'created_at': _timestampToIso(data['created_at']),
-      };
-    }).toList();
+    try {
+      final snapshot = await _db
+          .collection('pyq')
+          .where('year', isEqualTo: cleanYear)
+          .where('branch', isEqualTo: cleanBranch)
+          .where('semester', isEqualTo: cleanSemester)
+          .orderBy('created_at', descending: true)
+          .get();
+
+      return snapshot.docs.map(_mapPyqDoc).toList();
+    } on FirebaseException catch (e) {
+      final message = e.message?.toLowerCase() ?? '';
+      if (message.contains('requires an index') ||
+          message.contains('failed precondition')) {
+        final snapshot = await _db.collection('pyq').get();
+        final filtered = snapshot.docs.where((doc) {
+          final data = doc.data();
+          return _matchesPyqFilter(data, cleanYear, cleanBranch, cleanSemester);
+        }).toList();
+        filtered.sort((a, b) {
+          final aTs = a.data()['created_at'];
+          final bTs = b.data()['created_at'];
+          if (aTs is Timestamp && bTs is Timestamp) {
+            return bTs.compareTo(aTs);
+          }
+          return 0;
+        });
+        return filtered.map(_mapPyqDoc).toList();
+      }
+      rethrow;
+    }
+  }
+
+  static bool _matchesPyqFilter(
+    Map<String, dynamic> data,
+    String year,
+    String branch,
+    String semester,
+  ) {
+    final valueYear = data['year'];
+    final valueBranch = data['branch'];
+    final valueSemester = data['semester'];
+
+    final yearMatch =
+        valueYear?.toString().trim() == year ||
+        (valueYear is int && valueYear.toString() == year);
+    final branchMatch =
+        valueBranch?.toString().trim().toLowerCase() == branch.toLowerCase();
+    final semesterMatch =
+        valueSemester?.toString().trim() == semester ||
+        (valueSemester is int && valueSemester.toString() == semester);
+
+    return yearMatch && branchMatch && semesterMatch;
+  }
+
+  static Map<String, dynamic> _mapPyqDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return {
+      'id': doc.id,
+      'year': (data['year'] ?? '').toString(),
+      'branch': (data['branch'] ?? '').toString(),
+      'semester': (data['semester'] ?? '').toString(),
+      'subject': (data['subject'] ?? '').toString(),
+      'drive_link': (data['drive_link'] ?? '').toString(),
+      'uploaded_by': (data['uploaded_by'] ?? '').toString(),
+      'created_at': _timestampToIso(data['created_at']),
+    };
   }
 
   static Future<void> uploadPyq({
@@ -270,7 +416,8 @@ class Api {
     }
 
     final cleanLink = driveLink.trim();
-    if (!(cleanLink.startsWith('http://') || cleanLink.startsWith('https://'))) {
+    if (!(cleanLink.startsWith('http://') ||
+        cleanLink.startsWith('https://'))) {
       throw Exception('Valid drive link is required');
     }
 
@@ -294,11 +441,7 @@ class Api {
     }
 
     if (studentRoll == _adminEmployeeId) {
-      return {
-        'status': 'approved',
-        'can_send_message': true,
-        'is_admin': true,
-      };
+      return {'status': 'approved', 'can_send_message': true, 'is_admin': true};
     }
 
     final memberDoc = await _db
@@ -361,13 +504,13 @@ class Api {
         .collection('requests')
         .doc(studentRoll)
         .set({
-      'student_roll': studentRoll,
-      'student_name': studentName.trim(),
-      'status': 'pending',
-      'reviewed_by': null,
-      'created_at': FieldValue.serverTimestamp(),
-      'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+          'student_roll': studentRoll,
+          'student_name': studentName.trim(),
+          'status': 'pending',
+          'reviewed_by': null,
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   static Future<List<Map<String, dynamic>>> fetchClubMessages({
@@ -439,10 +582,9 @@ class Api {
         .doc(clubName)
         .collection('requests')
         .where('status', isEqualTo: 'pending')
-        .orderBy('created_at')
         .get();
 
-    return snapshot.docs.map((doc) {
+    final requests = snapshot.docs.map((doc) {
       final data = doc.data();
       return {
         'id': doc.id,
@@ -451,7 +593,22 @@ class Api {
         'status': (data['status'] ?? '').toString(),
         'created_at': _timestampToIso(data['created_at']),
         'updated_at': _timestampToIso(data['updated_at']),
+        '_created_at_raw': data['created_at'],
       };
+    }).toList();
+
+    requests.sort((a, b) {
+      final aValue = a['_created_at_raw'];
+      final bValue = b['_created_at_raw'];
+      if (aValue is Timestamp && bValue is Timestamp) {
+        return aValue.compareTo(bValue);
+      }
+      return 0;
+    });
+
+    return requests.map((request) {
+      request.remove('_created_at_raw');
+      return request;
     }).toList();
   }
 
@@ -497,13 +654,13 @@ class Api {
           .collection('memberships')
           .doc(requestId)
           .set({
-        'student_roll': (data['student_roll'] ?? '').toString(),
-        'student_name': (data['student_name'] ?? '').toString(),
-        'can_send_message': canSendMessage,
-        'approved_by': adminRoll,
-        'created_at': FieldValue.serverTimestamp(),
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'student_roll': (data['student_roll'] ?? '').toString(),
+            'student_name': (data['student_name'] ?? '').toString(),
+            'can_send_message': canSendMessage,
+            'approved_by': adminRoll,
+            'created_at': FieldValue.serverTimestamp(),
+            'updated_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     }
   }
 
@@ -581,11 +738,422 @@ class Api {
     }).toList();
   }
 
-  static Future<void> sendMessage(String group, String sender, String msg) async {
+  static Future<void> sendMessage(
+    String group,
+    String sender,
+    String msg,
+    {bool isAdmin = false, bool isCr = false}
+  ) async {
+    if (group.endsWith(' Announcements') || group.endsWith(' Notes')) {
+      if (!isAdmin && !isCr) {
+        throw Exception('Only Class Representatives can post in this group.');
+      }
+    }
+
     await _db.collection('group_messages').doc(group).collection('items').add({
       'sender': sender.trim(),
       'text': msg.trim(),
       'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Future<Map<String, dynamic>> searchStudentByRoll(
+    String rollNumber,
+  ) async {
+    final normalizedRoll = rollNumber.trim();
+    final userDoc = await _db.collection('users').doc(normalizedRoll).get();
+
+    if (!userDoc.exists) {
+      throw Exception('Student not found');
+    }
+
+    final data = userDoc.data()!;
+    final emailVerifiedOverride =
+        data['email_verified_admin_override'] ?? false;
+    final emailVerified =
+        emailVerifiedOverride || (data['email_verified'] ?? false);
+
+    return {
+      'name': (data['name'] ?? '').toString(),
+      'roll': (data['roll'] ?? '').toString(),
+      'role': (data['role'] ?? '').toString(),
+      'email': (data['email'] ?? '').toString(),
+      'created_at': _timestampToIso(data['created_at']),
+      'email_verified': emailVerified,
+      'email_verified_admin_override': emailVerifiedOverride,
+      'is_cr': data['is_cr'] == true,
+    };
+  }
+
+  static Future<void> updateStudentDetails({
+    required String rollNumber,
+    required String? email,
+    required String? password,
+    required bool emailVerified,
+    bool? isCr,
+  }) async {
+    final normalizedRoll = rollNumber.trim();
+    final userDoc = await _db.collection('users').doc(normalizedRoll).get();
+
+    if (!userDoc.exists) {
+      throw Exception('Student not found');
+    }
+
+    final data = userDoc.data()!;
+    final currentEmail = (data['email'] ?? '').toString();
+
+    // Update Firestore
+    final updateData = <String, dynamic>{};
+    if (email != null && email.isNotEmpty && email != currentEmail) {
+      // Check if email is already used by another user
+      final existingEmailQuery = await _db
+          .collection('users')
+          .where('email', isEqualTo: email.toLowerCase())
+          .limit(1)
+          .get();
+      if (existingEmailQuery.docs.isNotEmpty &&
+          existingEmailQuery.docs.first.id != normalizedRoll) {
+        throw Exception('This email is already registered to another user.');
+      }
+      updateData['email'] = email.toLowerCase();
+    }
+
+    if (emailVerified) {
+      updateData['email_verified_admin_override'] = true;
+    } else {
+      updateData['email_verified_admin_override'] = FieldValue.delete();
+    }
+
+    if (isCr != null) {
+      updateData['is_cr'] = isCr;
+    }
+
+    if (updateData.isNotEmpty) {
+      await _db.collection('users').doc(normalizedRoll).update(updateData);
+    }
+
+    // Update Firebase Auth
+    if (currentEmail.isNotEmpty || (email != null && email.isNotEmpty)) {
+      final authEmail = email ?? currentEmail;
+      if (authEmail.isNotEmpty) {
+        try {
+          // Get user by email
+          final userQuery = await FirebaseAuth.instance
+              .fetchSignInMethodsForEmail(authEmail);
+
+          if (userQuery.isNotEmpty) {
+            // User exists in Auth, update password if provided
+            if (password != null && password.isNotEmpty) {
+              // Note: This requires the user to be signed in or special admin privileges
+              // For now, we'll just update the password requirement in Firestore
+              // In a production app, you'd use Firebase Admin SDK
+              throw Exception(
+                'Password reset requires user to change it themselves. Please instruct the student to use "Forgot Password".',
+              );
+            }
+          } else if (email != null && email.isNotEmpty) {
+            // Create new Auth user if email provided but no Auth account exists
+            try {
+              final tempPassword =
+                  password ?? 'TempPass123!'; // Generate a temp password
+              final userCredential = await FirebaseAuth.instance
+                  .createUserWithEmailAndPassword(
+                    email: authEmail,
+                    password: tempPassword,
+                  );
+
+              if (emailVerified) {
+                await _db.collection('users').doc(normalizedRoll).update({
+                  'temp_password_set': true,
+                  'updated_at': FieldValue.serverTimestamp(),
+                });
+              }
+
+              await FirebaseAuth.instance
+                  .signOut(); // Sign out the admin-created account
+            } on FirebaseAuthException catch (e) {
+              if (e.code == 'email-already-in-use') {
+                throw Exception(
+                  'Email already exists in authentication system.',
+                );
+              }
+              throw Exception(
+                'Failed to create authentication account: ${e.message}',
+              );
+            }
+          }
+        } catch (e) {
+          if (e.toString().contains('Password reset requires')) {
+            rethrow;
+          }
+          // For other auth errors, continue with Firestore update
+          print('Auth update failed: $e');
+        }
+      }
+    }
+  }
+
+  // ==========================================
+  // ELECTION & POLLING MODULE
+  // ==========================================
+
+  /// Creates a new election (Admin only)
+  static Future<String> createElection({
+    required String adminRoll,
+    required String title,
+    required String description,
+    required String branch,
+    required String year,
+    required String semester,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String rules,
+  }) async {
+    if (adminRoll != _adminEmployeeId) {
+      throw Exception('Only admin can create elections');
+    }
+
+    final docRef = await _db.collection('elections').add({
+      'title': title.trim(),
+      'description': description.trim(),
+      'branch': branch.trim(),
+      'year': year.trim(),
+      'semester': semester.trim(),
+      'start_date': startDate.toIso8601String(),
+      'end_date': endDate.toIso8601String(),
+      'rules': rules.trim(),
+      'is_results_locked': true,
+      'status': 'active',
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    return docRef.id;
+  }
+
+  /// Adds a candidate to an election (Admin only)
+  static Future<void> addCandidate({
+    required String adminRoll,
+    required String electionId,
+    required String name,
+    required String rollNumber,
+    required String photoUrl,
+    required String manifesto,
+  }) async {
+    if (adminRoll != _adminEmployeeId) {
+      throw Exception('Only admin can add candidates');
+    }
+
+    final cleanRoll = rollNumber.trim();
+    
+    // Check if candidate already exists
+    final query = await _db
+        .collection('elections')
+        .doc(electionId)
+        .collection('candidates')
+        .where('roll_number', isEqualTo: cleanRoll)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      throw Exception('Candidate with this roll number already exists setup for this election.');
+    }
+
+    await _db
+        .collection('elections')
+        .doc(electionId)
+        .collection('candidates')
+        .add({
+      'name': name.trim(),
+      'roll_number': cleanRoll,
+      'photo_url': photoUrl.trim(),
+      'manifesto': manifesto.trim(),
+      'created_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Fetch elections that a student is eligible to vote in
+  static Future<List<Map<String, dynamic>>> fetchEligibleElections({
+    required String studentRoll,
+  }) async {
+    if (studentRoll == _adminEmployeeId) {
+      // Admins see all elections
+      final snapshot = await _db.collection('elections').orderBy('created_at', descending: true).get();
+      return snapshot.docs.map(_mapElectionDoc).toList();
+    }
+
+    // Decode roll to find branch, year
+    final decoded = _decodeRoll(studentRoll);
+    final year = decoded['year'] as String;
+    final branch = decoded['branch'] as String;
+
+    // Firebase queries require indexes for multiple fields, so we will pull all Active
+    // elections and filter locally for ease unless it gets massive.
+    final snapshot = await _db
+        .collection('elections')
+        .orderBy('created_at', descending: true)
+        .get();
+
+    final eligibleElections = snapshot.docs.where((doc) {
+      final data = doc.data();
+      final eYear = data['year']?.toString();
+      final eBranch = data['branch']?.toString();
+      
+      // Target matches OR is set to "All" (assuming blank/All means valid for everyone)
+      final yearMatch = eYear == year || eYear == 'All' || eYear == null || eYear.isEmpty;
+      final branchMatch = eBranch == branch || eBranch == 'All' || eBranch == null || eBranch.isEmpty;
+      
+      return yearMatch && branchMatch;
+    }).toList();
+
+    return eligibleElections.map(_mapElectionDoc).toList();
+  }
+
+  static Map<String, dynamic> _mapElectionDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return {
+      'id': doc.id,
+      'title': (data['title'] ?? '').toString(),
+      'description': (data['description'] ?? '').toString(),
+      'branch': (data['branch'] ?? 'All').toString(),
+      'year': (data['year'] ?? 'All').toString(),
+      'semester': (data['semester'] ?? 'All').toString(),
+      'start_date': (data['start_date'] ?? '').toString(),
+      'end_date': (data['end_date'] ?? '').toString(),
+      'rules': (data['rules'] ?? '').toString(),
+      'is_results_locked': data['is_results_locked'] == true,
+      'status': (data['status'] ?? 'active').toString(),
+    };
+  }
+
+  /// Fetch all candidates for an election
+  static Future<List<Map<String, dynamic>>> fetchCandidates(String electionId) async {
+    final snapshot = await _db
+        .collection('elections')
+        .doc(electionId)
+        .collection('candidates')
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id,
+        'name': (data['name'] ?? '').toString(),
+        'roll_number': (data['roll_number'] ?? '').toString(),
+        'photo_url': (data['photo_url'] ?? '').toString(),
+        'manifesto': (data['manifesto'] ?? '').toString(),
+      };
+    }).toList();
+  }
+
+  /// Check if a student has voted
+  static Future<bool> hasStudentVoted({
+    required String electionId,
+    required String studentRoll,
+  }) async {
+    final doc = await _db
+        .collection('elections')
+        .doc(electionId)
+        .collection('votes')
+        .doc(studentRoll)
+        .get();
+        
+    return doc.exists;
+  }
+
+  /// Cast a vote securely
+  static Future<void> castVote({
+    required String electionId,
+    required String candidateId,
+    required String studentRoll,
+  }) async {
+    if (studentRoll == _adminEmployeeId) {
+      throw Exception('Admins cannot vote.');
+    }
+
+    final electionRef = _db.collection('elections').doc(electionId);
+    final voteRef = electionRef.collection('votes').doc(studentRoll);
+    
+    await _db.runTransaction((transaction) async {
+      // 1. Verify election is active
+      final electionDoc = await transaction.get(electionRef);
+      if (!electionDoc.exists) throw Exception('Election not found');
+      
+      final endDateStr = electionDoc.data()?['end_date']?.toString() ?? '';
+      if (endDateStr.isNotEmpty) {
+        final endDate = DateTime.tryParse(endDateStr);
+        if (endDate != null && DateTime.now().isAfter(endDate)) {
+          throw Exception('Voting is closed for this election.');
+        }
+      }
+      
+      if (electionDoc.data()?['status'] == 'ended') {
+        throw Exception('Voting has ended.');
+      }
+
+      // 2. Prevent double voting
+      final voteDoc = await transaction.get(voteRef);
+      if (voteDoc.exists) {
+        throw Exception('You have already cast your vote in this election.');
+      }
+
+      // 3. Register vote (record who voted to avoid dupes, but only link candidate temporarily if needed)
+      transaction.set(voteRef, {
+        'candidate_id': candidateId, // Anonymous systems wouldn't store this, but we need it to count naturally via Firebase
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  /// Fetch results (Will only succeed if admin or rules allow)
+  static Future<Map<String, int>> fetchElectionResults({
+    required String electionId,
+    required String requestingRoll,
+  }) async {
+    final electionDoc = await _db.collection('elections').doc(electionId).get();
+    if (!electionDoc.exists) throw Exception('Election not found');
+
+    final isLocked = electionDoc.data()?['is_results_locked'] == true;
+    if (isLocked && requestingRoll != _adminEmployeeId) {
+      throw Exception('Results are locked and currently hidden by admin.');
+    }
+
+    final votesSnapshot = await _db
+        .collection('elections')
+        .doc(electionId)
+        .collection('votes')
+        .get();
+
+    final Map<String, int> results = {};
+    for (var doc in votesSnapshot.docs) {
+      final candidateId = doc.data()['candidate_id'] as String?;
+      if (candidateId != null) {
+        results[candidateId] = (results[candidateId] ?? 0) + 1;
+      }
+    }
+    return results;
+  }
+
+  /// Admin toggle results lock
+  static Future<void> toggleResultsLock({
+    required String adminRoll,
+    required String electionId,
+    required bool lock,
+  }) async {
+    if (adminRoll != _adminEmployeeId) throw Exception('Admin only');
+    await _db.collection('elections').doc(electionId).update({
+      'is_results_locked': lock,
+    });
+  }
+
+  /// Admin end election
+  static Future<void> endElection({
+    required String adminRoll,
+    required String electionId,
+  }) async {
+    if (adminRoll != _adminEmployeeId) throw Exception('Admin only');
+    await _db.collection('elections').doc(electionId).update({
+      'status': 'ended',
     });
   }
 }

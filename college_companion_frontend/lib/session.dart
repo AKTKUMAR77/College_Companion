@@ -3,6 +3,7 @@ class UserSession {
   static String roll = '';
   static String role = '';
   static bool isAdmin = false;
+  static bool isCr = false;
   static List<String> groups = [];
 
   // ---------------- STATE ----------------
@@ -18,12 +19,14 @@ class UserSession {
     required String rollNumber,
     required String userRole,
     required bool admin,
+    required bool cr,
     required List<String> userGroups,
   }) {
     name = userName;
     roll = rollNumber;
     role = userRole;
     isAdmin = admin;
+    isCr = cr;
     groups = userGroups;
   }
 
@@ -36,6 +39,7 @@ class UserSession {
     roll = '';
     role = '';
     isAdmin = false;
+    isCr = false;
     groups = [];
   }
 }

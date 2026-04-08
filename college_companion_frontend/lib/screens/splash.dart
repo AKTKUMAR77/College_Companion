@@ -11,12 +11,29 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late AnimationController _fadeController;
+
   @override
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 2), () {
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _scaleController.forward();
+    _fadeController.forward();
+
+    Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -30,72 +47,123 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _scaleController.dispose();
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.lightCream,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.brandBlue, AppTheme.brandSky],
-          ),
-        ),
+        decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: Stack(
           children: [
+            // Decorative circles
             Positioned(
-              top: -70,
-              right: -40,
-              child: Container(
-                width: 190,
-                height: 190,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
-                  shape: BoxShape.circle,
+              top: -100,
+              right: -60,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0, end: 1).animate(
+                  CurvedAnimation(
+                    parent: _scaleController,
+                    curve: Curves.easeOutBack,
+                  ),
+                ),
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    color: AppTheme.richBrown.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
             ),
             Positioned(
-              bottom: -80,
-              left: -50,
+              bottom: -120,
+              left: -80,
               child: Container(
-                width: 230,
-                height: 230,
+                width: 300,
+                height: 300,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: AppTheme.golden.withOpacity(0.06),
                   shape: BoxShape.circle,
                 ),
               ),
             ),
-            const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.school_rounded, size: 94, color: Colors.white),
-                  SizedBox(height: 18),
-                  Text(
-                    "College Companion",
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
+
+            // Center Content
+            Center(
+              child: FadeTransition(
+                opacity: Tween<double>(
+                  begin: 0,
+                  end: 1,
+                ).animate(_fadeController),
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.8, end: 1).animate(
+                    CurvedAnimation(
+                      parent: _scaleController,
+                      curve: Curves.easeOutCubic,
                     ),
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Connect. Collaborate. Grow.",
-                    style: TextStyle(color: Colors.white70, fontSize: 15),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.primaryGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: [AppTheme.premiumShadow],
+                        ),
+                        child: Icon(
+                          Icons.school_rounded,
+                          size: 96,
+                          color: AppTheme.cream,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // App Name
+                      Text(
+                        "College Companion",
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textDark,
+                              letterSpacing: 0.5,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Tagline
+                      Text(
+                        "Connect. Collaborate. Grow.",
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.textMuted,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Loading Indicator
+                      SizedBox(
+                        height: 32,
+                        width: 32,
+                        child: CircularProgressIndicator(
+                          color: AppTheme.richBrown,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 28),
-                  SizedBox(
-                    height: 28,
-                    width: 28,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.6,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],

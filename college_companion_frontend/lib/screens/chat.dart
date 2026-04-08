@@ -35,6 +35,8 @@ class _ChatPageState extends State<ChatPage> {
         widget.group,
         UserSession.name,
         controller.text.trim(),
+        isAdmin: UserSession.isAdmin,
+        isCr: UserSession.isCr,
       );
       controller.clear();
       await fetch();
@@ -54,127 +56,158 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final currentUser = UserSession.name;
+    final bool isRestrictedGroup = widget.group.endsWith(' Announcements') || widget.group.endsWith(' Notes');
+    final bool canSend = !isRestrictedGroup || UserSession.isAdmin || UserSession.isCr;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.group), centerTitle: false),
-      body: Column(
-        children: [
-          Expanded(
-            child: messages.isEmpty
-                ? const Center(
-                    child: Text('No messages yet. Start the conversation.'),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                    itemCount: messages.length,
-                    itemBuilder: (context, i) {
-                      final m = messages[i];
-                      final sender = (m['sender'] ?? '').toString();
-                      final text = (m['text'] ?? '').toString();
-                      final isMine = sender == currentUser;
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Icon(Icons.chat_rounded, color: AppTheme.cream, size: 28),
+            const SizedBox(width: 12),
+            Text(widget.group),
+          ],
+        ),
+        centerTitle: false,
+        backgroundColor: AppTheme.richBrown,
+        elevation: 8,
+      ),
+      backgroundColor: AppTheme.lightCream,
+      body: Container(
+        decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
+        child: Column(
+          children: [
+            Expanded(
+              child: messages.isEmpty
+                  ? const Center(
+                      child: Text('No messages yet. Start the conversation.'),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                      itemCount: messages.length,
+                      itemBuilder: (context, i) {
+                        final m = messages[i];
+                        final sender = (m['sender'] ?? '').toString();
+                        final text = (m['text'] ?? '').toString();
+                        final isMine = sender == currentUser;
 
-                      return Align(
-                        alignment:
-                            isMine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMine ? AppTheme.brandBlue : Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(14),
-                              topRight: const Radius.circular(14),
-                              bottomLeft: Radius.circular(isMine ? 14 : 4),
-                              bottomRight: Radius.circular(isMine ? 4 : 14),
+                        return Align(
+                          alignment: isMine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.75,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
+                            decoration: BoxDecoration(
+                              color: isMine ? AppTheme.richBrown : Colors.white,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(14),
+                                topRight: const Radius.circular(14),
+                                bottomLeft: Radius.circular(isMine ? 14 : 4),
+                                bottomRight: Radius.circular(isMine ? 4 : 14),
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sender,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isMine ? Colors.white70 : AppTheme.brandBlue,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                text,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: isMine ? Colors.white : AppTheme.textStrong,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.blueGrey.shade50)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Type a message',
-                        prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: AppTheme.brandBlue,
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: _sending ? null : _sendMessage,
-                      child: SizedBox(
-                        height: 52,
-                        width: 52,
-                        child: Center(
-                          child: _sending
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  sender,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isMine
+                                        ? Colors.white70
+                                        : AppTheme.richBrown,
                                   ),
-                                )
-                              : const Icon(Icons.send_rounded, color: Colors.white),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  text,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: isMine
+                                        ? Colors.white
+                                        : AppTheme.textDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    top: BorderSide(color: Colors.blueGrey.shade50),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        enabled: canSend,
+                        decoration: InputDecoration(
+                          labelText: canSend ? 'Type a message' : 'Restricted Group',
+                          hintText: canSend ? '' : 'Only CRs can post here',
+                          prefixIcon: Icon(canSend ? Icons.chat_bubble_outline_rounded : Icons.lock),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    if (canSend)
+                      Material(
+                        color: AppTheme.richBrown,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _sending ? null : _sendMessage,
+                          child: SizedBox(
+                            height: 52,
+                            width: 52,
+                            child: Center(
+                              child: _sending
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.send_rounded,
+                                      color: Colors.white,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
