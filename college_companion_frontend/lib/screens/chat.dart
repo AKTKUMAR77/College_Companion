@@ -61,6 +61,7 @@ class _ChatPageState extends State<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: AppTheme.appBarFlexibleSpace(),
         title: Row(
           children: [
             Icon(Icons.chat_rounded, color: AppTheme.cream, size: 28),
@@ -69,14 +70,16 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         centerTitle: false,
-        backgroundColor: AppTheme.richBrown,
+        backgroundColor: Colors.transparent,
         elevation: 8,
+        shadowColor: AppTheme.shadowColor,
       ),
-      backgroundColor: AppTheme.lightCream,
+      backgroundColor: AppTheme.backgroundLavender,
       body: Container(
         decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: Column(
           children: [
+            AppTheme.headerPullUpLayer(),
             Expanded(
               child: messages.isEmpty
                   ? const Center(
@@ -103,7 +106,9 @@ class _ChatPageState extends State<ChatPage> {
                                   MediaQuery.of(context).size.width * 0.75,
                             ),
                             decoration: BoxDecoration(
-                              color: isMine ? AppTheme.richBrown : Colors.white,
+                              color: isMine
+                                  ? AppTheme.primaryDark
+                                  : AppTheme.surface,
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(14),
                                 topRight: const Radius.circular(14),
@@ -128,7 +133,7 @@ class _ChatPageState extends State<ChatPage> {
                                     fontWeight: FontWeight.w700,
                                     color: isMine
                                         ? Colors.white70
-                                        : AppTheme.richBrown,
+                                        : AppTheme.primaryDark,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -138,7 +143,7 @@ class _ChatPageState extends State<ChatPage> {
                                     fontSize: 15,
                                     color: isMine
                                         ? Colors.white
-                                        : AppTheme.textDark,
+                                        : AppTheme.onPrimary,
                                   ),
                                 ),
                               ],
@@ -153,9 +158,11 @@ class _ChatPageState extends State<ChatPage> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppTheme.surface,
                   border: Border(
-                    top: BorderSide(color: Colors.blueGrey.shade50),
+                    top: BorderSide(
+                      color: AppTheme.primaryAccent.withOpacity(0.25),
+                    ),
                   ),
                 ),
                 child: Row(
@@ -176,14 +183,19 @@ class _ChatPageState extends State<ChatPage> {
                     const SizedBox(width: 8),
                     if (canSend)
                       Material(
-                        color: AppTheme.richBrown,
-                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(26),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(26),
                           onTap: _sending ? null : _sendMessage,
-                          child: SizedBox(
+                          child: Container(
                             height: 52,
                             width: 52,
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.primaryGradient,
+                              shape: BoxShape.circle,
+                              boxShadow: [AppTheme.softShadow],
+                            ),
                             child: Center(
                               child: _sending
                                   ? const SizedBox(

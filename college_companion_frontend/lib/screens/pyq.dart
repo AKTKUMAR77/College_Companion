@@ -302,8 +302,9 @@ class _PyqPageState extends State<PyqPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightCream,
+      backgroundColor: AppTheme.backgroundLavender,
       appBar: AppBar(
+        flexibleSpace: AppTheme.appBarFlexibleSpace(),
         title: Row(
           children: [
             Icon(Icons.menu_book_rounded, color: AppTheme.cream, size: 28),
@@ -311,8 +312,9 @@ class _PyqPageState extends State<PyqPage> with TickerProviderStateMixin {
             const Text('PYQ Library'),
           ],
         ),
-        backgroundColor: AppTheme.richBrown,
+        backgroundColor: Colors.transparent,
         elevation: 8,
+        shadowColor: AppTheme.shadowColor,
         actions: [
           if (UserSession.isAdmin)
             IconButton(
@@ -349,6 +351,7 @@ class _PyqPageState extends State<PyqPage> with TickerProviderStateMixin {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      AppTheme.headerPullUpLayer(),
                       // Filters Header
                       Container(
                         padding: const EdgeInsets.all(16),

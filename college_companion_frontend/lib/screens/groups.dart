@@ -10,10 +10,14 @@ class GroupsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groups = UserSession.groups;
+    final groupsCount = groups.length;
+    final pyqCount = 0;
+    final clubsCount = 0;
 
     return Scaffold(
-      backgroundColor: AppTheme.lightCream,
+      backgroundColor: AppTheme.backgroundLavender,
       appBar: AppBar(
+        flexibleSpace: AppTheme.appBarFlexibleSpace(),
         title: Row(
           children: [
             Icon(Icons.groups_rounded, color: AppTheme.cream, size: 28),
@@ -21,8 +25,24 @@ class GroupsPage extends StatelessWidget {
             Text('Hi ${UserSession.name}'),
           ],
         ),
-        backgroundColor: AppTheme.richBrown,
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
         elevation: 8,
+        shadowColor: AppTheme.shadowColor,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(96),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildStatCard('Groups', groupsCount.toString()),
+                _buildStatCard('PYQs saved', pyqCount.toString()),
+                _buildStatCard('Clubs joined', clubsCount.toString()),
+              ],
+            ),
+          ),
+        ),
         actions: [
           PopupMenuButton<String>(
             tooltip: 'Account',
@@ -44,30 +64,64 @@ class GroupsPage extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [AppTheme.softShadow],
                 ),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Colors.transparent,
-                  child: Icon(
-                    Icons.person_rounded,
-                    size: 20,
-                    color: AppTheme.cream,
-                  ),
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.transparent,
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: 20,
+                        color: AppTheme.cream,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF34D399),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.logout_rounded,
-                      size: 18,
-                      color: AppTheme.richBrown,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Logout'),
-                  ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: Color(0xFFEF4444),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Logout',
+                        style: TextStyle(color: Color(0xFFEF4444)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -80,6 +134,7 @@ class GroupsPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              AppTheme.headerPullUpLayer(),
               // Header Container
               Container(
                 padding: const EdgeInsets.all(24),
@@ -231,6 +286,40 @@ class GroupsPage extends StatelessWidget {
     );
   }
 
+  Widget _buildStatCard(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickCard(
     BuildContext context, {
     required IconData icon,
@@ -260,7 +349,7 @@ class GroupsPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: AppTheme.accentGradient,
+                    gradient: AppTheme.iconGradientA,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, size: 24, color: AppTheme.cream),
@@ -314,8 +403,8 @@ class GroupsPage extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     gradient: index % 2 == 0
-                        ? AppTheme.primaryGradient
-                        : AppTheme.accentGradient,
+                        ? AppTheme.iconGradientA
+                        : AppTheme.iconGradientB,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

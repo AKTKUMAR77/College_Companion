@@ -207,7 +207,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
   Widget _buildStatusCard() {
     if (_isAdmin) {
       return Card(
-        color: const Color(0xFFEAF2FF),
+        color: AppTheme.primaryLight,
         child: const Padding(
           padding: EdgeInsets.all(14),
           child: Text(
@@ -220,7 +220,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     if (_status == 'approved') {
       return Card(
-        color: const Color(0xFFEFFDF8),
+        color: AppTheme.primaryLight,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Text(
@@ -235,7 +235,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     if (_status == 'pending') {
       return Card(
-        color: const Color(0xFFFFF5E8),
+        color: AppTheme.primaryAccent.withOpacity(0.22),
         child: const Padding(
           padding: EdgeInsets.all(14),
           child: Text(
@@ -248,7 +248,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     if (_status == 'rejected') {
       return Card(
-        color: const Color(0xFFFFEBEE),
+        color: AppTheme.primaryAccent.withOpacity(0.18),
         child: const Padding(
           padding: EdgeInsets.all(14),
           child: Text(
@@ -260,7 +260,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
     }
 
     return Card(
-      color: const Color(0xFFFFF5E8),
+      color: AppTheme.primaryAccent.withOpacity(0.22),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -313,7 +313,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFF),
+                    color: AppTheme.primaryLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
@@ -415,7 +415,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.all(12),
@@ -438,7 +438,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
               decoration: BoxDecoration(
-                color: isMine ? AppTheme.richBrown : const Color(0xFFF6F9FF),
+                color: isMine ? AppTheme.primaryDark : AppTheme.primaryLight,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(14),
                   topRight: const Radius.circular(14),
@@ -454,7 +454,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: isMine ? Colors.white70 : AppTheme.richBrown,
+                      color: isMine ? Colors.white70 : AppTheme.primaryDark,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -462,7 +462,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
                     text,
                     style: TextStyle(
                       fontSize: 15,
-                      color: isMine ? Colors.white : AppTheme.textDark,
+                      color: isMine ? Colors.white : AppTheme.onPrimary,
                     ),
                   ),
                 ],
@@ -480,8 +480,10 @@ class _ClubChatPageState extends State<ClubChatPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.blueGrey.shade50)),
+        color: AppTheme.surface,
+        border: Border(
+          top: BorderSide(color: AppTheme.primaryAccent.withOpacity(0.25)),
+        ),
       ),
       child: Row(
         children: [
@@ -501,7 +503,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
           ),
           const SizedBox(width: 8),
           Material(
-            color: canCompose ? AppTheme.richBrown : Colors.blueGrey.shade300,
+            color: canCompose
+                ? AppTheme.primaryDark
+                : AppTheme.primaryAccent.withOpacity(0.5),
             borderRadius: BorderRadius.circular(14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
@@ -535,6 +539,7 @@ class _ClubChatPageState extends State<ClubChatPage> {
 
     return Scaffold(
       appBar: AppBar(
+        flexibleSpace: AppTheme.appBarFlexibleSpace(),
         title: Row(
           children: [
             Icon(Icons.group_rounded, color: AppTheme.cream, size: 28),
@@ -543,8 +548,9 @@ class _ClubChatPageState extends State<ClubChatPage> {
           ],
         ),
         centerTitle: false,
-        backgroundColor: AppTheme.richBrown,
+        backgroundColor: Colors.transparent,
         elevation: 8,
+        shadowColor: AppTheme.shadowColor,
         actions: [
           IconButton(
             onPressed: _refreshAll,
@@ -552,13 +558,14 @@ class _ClubChatPageState extends State<ClubChatPage> {
           ),
         ],
       ),
-      backgroundColor: AppTheme.lightCream,
+      backgroundColor: AppTheme.backgroundLavender,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Container(
               decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
               child: Column(
                 children: [
+                  AppTheme.headerPullUpLayer(),
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),

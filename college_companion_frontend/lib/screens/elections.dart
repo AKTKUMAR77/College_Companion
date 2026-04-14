@@ -119,17 +119,17 @@ class _ElectionsScreenState extends State<ElectionsScreen>
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.1),
+                              color: AppTheme.accentSoft,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.amber.withOpacity(0.3),
+                                color: AppTheme.primaryAccent.withOpacity(0.25),
                               ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.info_outline,
-                                  color: Colors.amber.shade700,
+                                  color: AppTheme.primaryAccent,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
@@ -137,7 +137,7 @@ class _ElectionsScreenState extends State<ElectionsScreen>
                                   child: Text(
                                     'No active polls at the moment',
                                     style: textTheme.bodyMedium?.copyWith(
-                                      color: Colors.amber.shade700,
+                                      color: AppTheme.primaryAccent,
                                     ),
                                   ),
                                 ),

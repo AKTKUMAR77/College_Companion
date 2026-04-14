@@ -203,8 +203,9 @@ class _ClubsScreenState extends State<ClubsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightCream,
+      backgroundColor: AppTheme.backgroundLavender,
       appBar: AppBar(
+        flexibleSpace: AppTheme.appBarFlexibleSpace(),
         title: Row(
           children: [
             Icon(Icons.emoji_events_rounded, color: AppTheme.cream, size: 28),
@@ -212,13 +213,15 @@ class _ClubsScreenState extends State<ClubsScreen> {
             const Text('Clubs & Societies'),
           ],
         ),
-        backgroundColor: AppTheme.richBrown,
+        backgroundColor: Colors.transparent,
         elevation: 8,
+        shadowColor: AppTheme.shadowColor,
       ),
       body: Container(
         decoration: BoxDecoration(gradient: AppTheme.backgroundGradient),
         child: Column(
           children: [
+            AppTheme.headerPullUpLayer(),
             // Category Filter
             SizedBox(
               height: 60,
@@ -232,24 +235,36 @@ class _ClubsScreenState extends State<ClubsScreen> {
                     final isSelected = category == _selectedCategory;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(category),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedCategory = category;
-                          });
-                        },
-                        backgroundColor: AppTheme.lightCream,
-                        selectedColor: AppTheme.richBrown.withAlpha(26),
-                        checkmarkColor: AppTheme.richBrown,
-                        labelStyle: TextStyle(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: isSelected
+                              ? AppTheme.primaryGradient
+                              : null,
                           color: isSelected
-                              ? AppTheme.richBrown
-                              : AppTheme.textDark,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                              ? null
+                              : const Color(0xFFF3F0FF),
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        child: FilterChip(
+                          label: Text(category),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedCategory = category;
+                            });
+                          },
+                          backgroundColor: Colors.transparent,
+                          selectedColor: Colors.transparent,
+                          checkmarkColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF7C3AED),
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          side: BorderSide.none,
                         ),
                       ),
                     );
@@ -385,8 +400,8 @@ class _ClubsScreenState extends State<ClubsScreen> {
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
                                         gradient: index.isEven
-                                            ? AppTheme.primaryGradient
-                                            : AppTheme.accentGradient,
+                                            ? AppTheme.iconGradientA
+                                            : AppTheme.iconGradientB,
                                         borderRadius: BorderRadius.circular(10),
                                         boxShadow: [AppTheme.softShadow],
                                       ),

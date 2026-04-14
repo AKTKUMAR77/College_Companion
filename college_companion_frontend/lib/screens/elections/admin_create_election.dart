@@ -49,7 +49,10 @@ class _AdminCreateElectionScreenState extends State<AdminCreateElectionScreen> {
       builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(primary: AppTheme.richBrown),
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: AppTheme.primaryDark,
+              brightness: Brightness.light,
+            ),
           ),
           child: child!,
         );
@@ -63,7 +66,10 @@ class _AdminCreateElectionScreenState extends State<AdminCreateElectionScreen> {
         builder: (context, child) {
           return Theme(
             data: ThemeData.light().copyWith(
-              colorScheme: ColorScheme.light(primary: AppTheme.richBrown),
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: AppTheme.primaryDark,
+                brightness: Brightness.light,
+              ),
             ),
             child: child!,
           );

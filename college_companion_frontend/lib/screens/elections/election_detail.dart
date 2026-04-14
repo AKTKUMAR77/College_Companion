@@ -270,7 +270,7 @@ class _ElectionDetailScreenState extends State<ElectionDetailScreen> {
                   
                   // Admin Controls
                   if (UserSession.isAdmin) ...[
-                     const Divider(),
+                     const Divider(color: AppTheme.accentSoft),
                      Text('Admin Controls', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade700)),
                      const SizedBox(height: 12),
                      Wrap(
